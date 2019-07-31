@@ -1,0 +1,127 @@
+image: ondrejsika/ci
+
+
+stages:
+  - check variables
+  - lint
+  - build
+  - test
+  - dev deploy
+  - prod deploy
+
+
+variables:
+  GIT_CLEAN_FLAGS: -ffdx -e node_modules/ -e .next/
+
+  IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+  IMAGE_TESTS: $CI_REGISTRY_IMAGE/tests:$CI_COMMIT_REF_SLUG
+
+  KUBECONFIG: .kubeconfig
+
+check_variables:
+  stage: check variables
+  script:
+    - '[ ! -z "$KUBECONFIG_FILECONTENT" ]'
+    - '[ ! -z "$DEV_SUFFIX" ]'
+    - '[ ! -z "$PROD_DOMAIN" ]'
+
+lint:
+  image: node
+  stage: lint
+  script:
+    - yarn
+    - yarn run prettier-check
+
+build:
+  stage: build
+  variables:
+    COMPOSE_FILE: compose/main.yaml:compose/tests.yaml
+  script:
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker-compose build
+    - docker-compose push
+
+tests:
+  stage: test
+  variables:
+    COMPOSE_FILE: compose/main.yaml:compose/tests.yaml
+    COMPOSE_PROJECT_NAME: $CI_JOB_ID
+  script:
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker-compose run tests
+  after_script:
+    - docker-compose down
+
+.deploy template: &deploy_template
+  script:
+    - echo $KUBECONFIG_FILECONTENT | base64 --decode > .kubeconfig
+    - helm template ./helm/hello-world --name $DEPLOY_NAME --set image=$IMAGE --set host=$DEPLOY_URL | kubectl apply -f -
+
+.stop template: &stop_template
+  script:
+    - echo $KUBECONFIG_FILECONTENT | base64 --decode > .kubeconfig
+    - helm template ./helm/hello-world --name $DEPLOY_NAME --set image=$IMAGE --set host=$DEPLOY_URL | kubectl delete -f -
+
+dev deploy:
+  <<: *deploy_template
+  stage: dev deploy
+  variables:
+    DEPLOY_NAME: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    DEPLOY_URL: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG-188-166-195-72.nip.io
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+    url: https://$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG-188-166-195-72.nip.io
+    on_stop: stop dev
+
+stop dev:
+  <<: *stop_template
+  stage: dev deploy
+  when: manual
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+    action: stop
+
+dev deploy:
+  <<: *deploy_template
+  stage: dev deploy
+  variables:
+    DEPLOY_NAME: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    DEPLOY_URL: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG$DEV_SUFFIX
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+    url: https://$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG$DEV_SUFFIX
+    on_stop: stop dev
+
+stop dev:
+  <<: *stop_template
+  stage: dev deploy
+  when: manual
+  variables:
+    DEPLOY_NAME: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+    action: stop
+
+prod deploy:
+  <<: *deploy_template
+  stage: prod deploy
+  when: manual
+  variables:
+    DEPLOY_NAME: $PROD_DOMAIN
+    DEPLOY_URL: $PROD_DOMAIN
+  environment:
+    name: $PROD_DOMAIN
+    url: https://$PROD_DOMAIN
+    on_stop: stop prod
+  only:
+    - master
+
+stop prod:
+  <<: *stop_template
+  stage: prod deploy
+  when: manual
+  variables:
+    DEPLOY_NAME: $CI_PROJECT_PATH_SLUG
+  environment:
+    name: $PROD_DOMAIN
+    action: stop
