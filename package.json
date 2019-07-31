@@ -1,0 +1,18 @@
+{
+  "author": "Ondrej Sika <ondrej@ondrejsika.com>",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "next": "^9.0.2",
+    "prettier": "^1.18.2",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6"
+  },
+  "scripts": {
+    "dev": "next",
+    "build": "next build",
+    "static": "yarn run build && next export",
+    "prettier-check": "prettier -l \"**/*.js\"",
+    "prettier-write": "prettier --write \"**/*.js\""
+  }
+}
