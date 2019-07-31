@@ -1,0 +1,2 @@
+image: ondrejsika/go-hello-world:2
+host: example.local
