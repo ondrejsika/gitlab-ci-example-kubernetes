@@ -1,0 +1,7 @@
+version: '3.7'
+services:
+  tests:
+    build: ../tests
+    image: ${IMAGE_TESTS:-local-tests}
+    depends_on:
+      - hello
