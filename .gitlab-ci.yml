@@ -25,6 +25,12 @@ check_variables:
     - '[ ! -z "$DEV_SUFFIX" ]'
     - '[ ! -z "$PROD_DOMAIN" ]'
 
+editorconfig check:
+  image: mstruebing/editorconfig-checker
+  stage: lint
+  script:
+    - /ec
+
 lint:
   image: node
   stage: lint
