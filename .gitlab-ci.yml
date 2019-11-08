@@ -54,6 +54,7 @@ tests:
     COMPOSE_PROJECT_NAME: $CI_JOB_ID
   script:
     - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - docker-compose pull
     - docker-compose run tests
   after_script:
     - docker-compose down
